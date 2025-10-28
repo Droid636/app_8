@@ -1,6 +1,7 @@
 import { StatusBar } from 'expo-status-bar';
 import { StyleSheet, Text, View, TextInput, TouchableOpacity, FlatList, Animated, ScrollView } from 'react-native';
 import React, { useState, useRef } from "react";
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { LineChart } from "react-native-chart-kit";
 
 export default function App() {
@@ -10,6 +11,9 @@ export default function App() {
   const [estado, setEstado] = useState("");
   const [error, setError] = useState("");
   const [registros, setRegistros] = useState([]);
+  const [fecha, setFecha] = useState(new Date());
+  const [showDatePicker, setShowDatePicker] = useState(false);
+
   const marcadorAnim = useRef(new Animated.Value(0)).current;
 
   const parseInputs = () => {
@@ -63,8 +67,14 @@ export default function App() {
     setResultado(imcFinal);
     setEstado(estadoIMC);
 
-    const fecha = new Date().toLocaleDateString();
-    setRegistros([...registros, { id: Date.now().toString(), peso, altura, imc: imcFinal, estado: estadoIMC, fecha }]);
+    setRegistros([...registros, { 
+      id: Date.now().toString(), 
+      peso, 
+      altura, 
+      imc: imcFinal, 
+      estado: estadoIMC, 
+      fecha: fecha.toLocaleDateString() 
+    }]);
 
     Animated.timing(marcadorAnim, {
       toValue: calcularPosicionIMC(imc),
@@ -88,6 +98,11 @@ export default function App() {
     const minIMC = 0;
     const valor = Math.min(Math.max(imc, minIMC), maxIMC);
     return (valor / (maxIMC - minIMC)) * 100;
+  };
+
+  const onChangeDate = (event, selectedDate) => {
+    setShowDatePicker(false);
+    if (selectedDate) setFecha(selectedDate);
   };
 
   return (
@@ -149,6 +164,39 @@ export default function App() {
           onChangeText={setaltura}
         />
 
+        {/* 🔹 Fecha editable + calendario */}
+        <View style={{ width: "100%", marginBottom: 14 }}>
+          <TextInput
+            style={[styles.input, { marginBottom: 5 }]}
+            placeholder="Fecha (dd/mm/yyyy)"
+            value={fecha.toLocaleDateString()}
+            onChangeText={(text) => {
+              const partes = text.split('/');
+              if (partes.length === 3) {
+                const dia = parseInt(partes[0], 10);
+                const mes = parseInt(partes[1], 10) - 1;
+                const anio = parseInt(partes[2], 10);
+                const nuevaFecha = new Date(anio, mes, dia);
+                if (!isNaN(nuevaFecha)) setFecha(nuevaFecha);
+              }
+            }}
+          />
+
+          <TouchableOpacity style={styles.botonFecha} onPress={() => setShowDatePicker(true)}>
+            <Text style={styles.botonTexto}>Abrir calendario</Text>
+          </TouchableOpacity>
+
+          {showDatePicker && (
+            <DateTimePicker
+              value={fecha}
+              mode="date"
+              display="calendar"
+              onChange={onChangeDate}
+              //maximumDate={new Date()}
+            />
+          )}
+        </View>
+
         <View style={styles.botonesRow}>
           <TouchableOpacity style={styles.boton} onPress={() => operar("Hombre")}>
             <Text style={styles.botonTexto}>Hombre</Text>
@@ -159,8 +207,6 @@ export default function App() {
         </View>
 
         <Text style={styles.subtitulo}>Historial de Registros</Text>
-
-        {/* 🔹 FlatList con scroll independiente */}
         <View style={styles.listaContainer}>
           <FlatList
             data={registros}
@@ -177,44 +223,34 @@ export default function App() {
           />
         </View>
 
-        {/* 📊 Gráfica de progreso con scroll horizontal */}
         {registros.length > 0 && (
           <>
             <Text style={styles.subtitulo}>Progreso de IMC</Text>
-            <View style={styles.graficaContainer}>
-              <ScrollView horizontal showsHorizontalScrollIndicator={true}>
-                <LineChart
-                  data={{
-                    labels: registros.map((item) => item.fecha),
-                    datasets: [
-                      { data: registros.map((item) => parseFloat(item.imc)) },
-                    ],
-                  }}
-                  width={Math.max(400, registros.length * 90)}
-                  height={220}
-                  yAxisInterval={1}
-                  chartConfig={{
-                    backgroundColor: "#2563eb",
-                    backgroundGradientFrom: "#1e3a8a",
-                    backgroundGradientTo: "#2563eb",
-                    decimalPlaces: 2,
-                    color: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
-                    labelColor: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
-                    style: { borderRadius: 16 },
-                    propsForDots: {
-                      r: "5",
-                      strokeWidth: "2",
-                      stroke: "#ffffff",
-                    },
-                  }}
-                  bezier
-                  style={{
-                    marginVertical: 8,
-                    borderRadius: 16,
-                  }}
-                />
-              </ScrollView>
-            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={true}>
+              <LineChart
+                data={{
+                  labels: registros.map((item) => item.fecha),
+                  datasets: [
+                    { data: registros.map((item) => parseFloat(item.imc)) },
+                  ],
+                }}
+                width={Math.max(400, registros.length * 90)}
+                height={220}
+                yAxisInterval={1}
+                chartConfig={{
+                  backgroundColor: "#2563eb",
+                  backgroundGradientFrom: "#1e3a8a",
+                  backgroundGradientTo: "#2563eb",
+                  decimalPlaces: 2,
+                  color: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
+                  labelColor: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
+                  style: { borderRadius: 16 },
+                  propsForDots: { r: "5", strokeWidth: "2", stroke: "#ffffff" },
+                }}
+                bezier
+                style={{ marginVertical: 8, borderRadius: 16 }}
+              />
+            </ScrollView>
           </>
         )}
 
@@ -225,138 +261,25 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    alignItems: 'center',
-    padding: 20,
-  },
-  titulo: {
-    fontSize: 26,
-    fontWeight: "bold",
-    color: "white",
-    marginBottom: 20,
-  },
-  input: {
-    width: "100%",
-    borderWidth: 1,
-    borderColor: "#d1d5db",
-    borderRadius: 10,
-    padding: 14,
-    marginBottom: 14,
-    backgroundColor: "white",
-    fontSize: 16,
-  },
-  botonesRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    width: "100%",
-    marginTop: 15,
-  },
-  boton: {
-    flex: 1,
-    backgroundColor: "#0e56e6ff",
-    padding: 16,
-    margin: 5,
-    borderRadius: 10,
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 3,
-    elevation: 3,
-  },
-  botonTexto: {
-    color: "white",
-    fontSize: 18,
-    fontWeight: "bold",
-  },
-  resultadoBox: {
-    minHeight: 140,
-    width: "100%",
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#f3f4f6",
-    borderRadius: 12,
-    marginBottom: 20,
-    padding: 12,
-  },
-  resultado: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: "#111827",
-  },
-  estado: {
-    fontSize: 18,
-    marginTop: 6,
-  },
-  error: {
-    color: "red",
-    fontWeight: "600",
-    fontSize: 16,
-  },
-  placeholder: {
-    color: "#6b7280",
-    fontSize: 16,
-  },
-  subtitulo: {
-    fontSize: 20,
-    color: "white",
-    marginTop: 25,
-    marginBottom: 8,
-    fontWeight: "600",
-  },
-  listaContainer: {
-    width: "100%",
-    maxHeight: 200,
-    backgroundColor: "#f9fafb",
-    borderRadius: 10,
-    padding: 10,
-  },
-  fila: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    borderBottomWidth: 1,
-    borderColor: "#e5e7eb",
-    paddingVertical: 6,
-  },
-  celda: {
-    fontSize: 14,
-    color: "#111827",
-  },
-  medidorContainer: {
-    marginTop: 12,
-    width: "90%",
-    height: 20,
-    position: "relative",
-  },
-  barraFondo: {
-    flexDirection: "row",
-    width: "100%",
-    height: "100%",
-    borderRadius: 10,
-    overflow: "hidden",
-  },
-  segmento: {
-    height: "100%",
-  },
-  marcador: {
-    position: "absolute",
-    top: -6,
-    width: 2,
-    height: 32,
-    backgroundColor: "black",
-  },
-  etiquetaMedidor: {
-    marginTop: 4,
-    color: "#374151",
-    fontSize: 13,
-    letterSpacing: 3,
-  },
-  graficaContainer: {
-    marginTop: 10,
-    backgroundColor: "#f3f4f6",
-    borderRadius: 12,
-    padding: 10,
-    alignItems: "center",
-  },
+  container: { flex: 1, alignItems: 'center', padding: 20 },
+  titulo: { fontSize: 26, fontWeight: "bold", color: "white", marginBottom: 20 },
+  input: { width: "100%", borderWidth: 1, borderColor: "#d1d5db", borderRadius: 10, padding: 14, marginBottom: 14, backgroundColor: "white", fontSize: 16 },
+  botonFecha: { backgroundColor: "white", borderColor: "#d1d5db", borderWidth: 1, borderRadius: 10, padding: 14, width: "100%", marginBottom: 14, justifyContent: "center" },
+  botonTexto: { fontSize: 16, color: "#111827", textAlign: "center" },
+  botonesRow: { flexDirection: "row", justifyContent: "space-between", width: "100%", marginTop: 15 },
+  boton: { flex: 1, backgroundColor: "#0e56e6ff", padding: 16, margin: 5, borderRadius: 10, alignItems: "center" },
+  resultadoBox: { minHeight: 140, width: "100%", justifyContent: "center", alignItems: "center", backgroundColor: "#f3f4f6", borderRadius: 12, marginBottom: 20, padding: 12 },
+  resultado: { fontSize: 20, fontWeight: "bold", color: "#111827" },
+  estado: { fontSize: 18, marginTop: 6 },
+  error: { color: "red", fontWeight: "600", fontSize: 16 },
+  placeholder: { color: "#6b7280", fontSize: 16 },
+  subtitulo: { fontSize: 20, color: "white", marginTop: 25, marginBottom: 8, fontWeight: "600" },
+  listaContainer: { width: "100%", maxHeight: 200, backgroundColor: "#f9fafb", borderRadius: 10, padding: 10 },
+  fila: { flexDirection: "row", justifyContent: "space-between", borderBottomWidth: 1, borderColor: "#e5e7eb", paddingVertical: 6 },
+  celda: { fontSize: 14, color: "#111827" },
+  medidorContainer: { marginTop: 12, width: "90%", height: 20, position: "relative" },
+  barraFondo: { flexDirection: "row", width: "100%", height: "100%", borderRadius: 10, overflow: "hidden" },
+  segmento: { height: "100%" },
+  marcador: { position: "absolute", top: -6, width: 2, height: 32, backgroundColor: "black" },
+  etiquetaMedidor: { marginTop: 4, color: "#374151", fontSize: 13, letterSpacing: 3 },
 });
